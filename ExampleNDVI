@@ -1,0 +1,5 @@
+#Example of simple use of function 
+DownloadMODIS(MODIS="MOD13Q1", VERSION="006", DATE="2015.10.16", TILE="h18v05")
+
+
+#Example to loop through dates and tiles
