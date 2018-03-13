@@ -1,0 +1,15 @@
+DownloadMODIS = function(MODIS, VERSION, DATE, TILE){
+  url <- getURL(paste0("https://e4ftl01.cr.usgs.gov/MOLT/",MODIS,".",VERSION,"/",DATE,"/"))
+  
+  url2 <- strsplit(url, "\n")
+  
+  FILE.NAMES = unlist(lapply(url2, function(x){substr(x, 53,97)}))
+  
+  FILE = grep(TILE,FILE.NAMES)
+  
+  gt = GET(paste0("https://e4ftl01.cr.usgs.gov/MOLT/",MODIS,".",VERSION,"/",DATE,"/",paste(FILE.NAMES[FILE[4]])), 
+           authenticate("fveronesi80", "Usg_2012"),
+           write_disk(FILE.NAMES[FILE[length(FILE)]],overwrite = T))
+  
+  return(FILE.NAMES[FILE[length(FILE)]])
+}
