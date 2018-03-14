@@ -8,7 +8,9 @@ DownloadMODIS = function(MODIS, VERSION, DATE, TILE){
   FILE = grep(TILE,FILE.NAMES)
   
   gt = GET(paste0("https://e4ftl01.cr.usgs.gov/MOLT/",MODIS,".",VERSION,"/",DATE,"/",paste(FILE.NAMES[FILE[4]])), 
-           authenticate("fveronesi80", "Usg_2012"),
+  
+           #In the line below please replace username and password with what you used to register to Earthdata
+           authenticate("username", "password"),
            write_disk(FILE.NAMES[FILE[length(FILE)]],overwrite = T))
   
   return(FILE.NAMES[FILE[length(FILE)]])
