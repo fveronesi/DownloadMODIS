@@ -1,5 +1,122 @@
+library(RCurl)
+library(XML)
+library(MODIS)
+library(rgdal)
+library(raster)
+library(httr)
+library(parallel)
+
 #Example of simple use of function 
+##################################
 DownloadMODIS(MODIS="MOD13Q1", VERSION="006", DATE="2015.10.16", TILE="h18v05")
 
 
 #Example to loop through dates and tiles
+########################################
+setwd("F:/MODIS")
+
+#Set Up Parameters
+MODIS="MOD13Q1"
+VERSION="006"
+
+MRTpath = "F:/MRT/bin"
+
+url <- getURL(paste0("https://e4ftl01.cr.usgs.gov/MOLT/",MODIS,".",VERSION,"/"))
+url2 <- strsplit(url, "\n")
+DATE = unlist(lapply(url2, function(x){substr(x, 52,61)}))
+
+Date2 = as.Date(DATE, format="%Y.%m.%d")
+
+
+#Download MODIS, Mosaic and Reproject
+cluster <- makeCluster(5) 
+registerDoParallel(cluster)
+clusterEvalQ(cl=cluster, library(RCurl))
+clusterEvalQ(cl=cluster, library(httr))
+clusterEvalQ(cl=cluster, library(XML))
+
+
+for(YR in na.omit(unique(format(Date2,"%Y")))){
+  years = subset(Date2, format(Date2,"%Y")==YR)
+  
+  TILES = getTile(tileH=17:20, tileV=1:5)
+  
+  
+  for(i in 1:length(years)){
+    clusterExport(cl=cluster, c("DownloadMODIS","DATE","Date2","MODIS","VERSION","years","i"))
+    parSapply(cluster, TILES@tile, function(x){DownloadMODIS(MODIS=MODIS, VERSION=VERSION, DATE=DATE[which(Date2==years[i])], TILE=x)})
+    
+    
+    #Mosaic
+    #####################
+    rast.list = list.files(getwd(), "hdf", full.names=F)
+    
+    #Create file .prm within the MRT folder
+    mosaicname = file(paste(MRTpath, "/TmpMosaic.prm", sep=""), open="wt")
+    write(paste(getwd(),"/",rast.list[1], sep=""), mosaicname)
+    for (j in 2:length(rast.list)) write(paste(getwd(),"/",rast.list[j], sep=""),mosaicname,append=T)
+    close(mosaicname)
+    
+    #The first band is NDVI, the second is EVI
+    bands_subset = "1 0 0 0 0 0 0 0 0 0 0 0"
+    
+    #This line sends the code to execute mrtmosaic (within MODIS Reprojection Tool) via command line
+    system(paste(MRTpath, '/mrtmosaic -i ', MRTpath, '/TmpMosaic.prm -s "',bands_subset,'" -o ',getwd(), '/',"NDVI_",TL,DATE[which(Date2==years[i])],".hdf", sep=""))
+
+    
+    #Reproject UTM
+    ####################
+    fname = file('tmp.prm', open="wt")
+    write(paste('INPUT_FILENAME = ', getwd(), '/',"NDVI_",TL,DATE[which(Date2==years[i])],".hdf", sep=""), fname) 
+    if (bands_subset != '') {
+      write(paste('SPECTRAL_SUBSET = ( ' ,1, ' )',sep=''),fname,append=TRUE)
+    }
+    write(paste('OUTPUT_FILENAME = ', "NDVI_WGS_",TL,DATE[which(Date2==years[i])],".tif", sep=""), fname, append=TRUE)
+    write(paste('RESAMPLING_TYPE = ',"CUBIC_CONVOLUTION",sep=''), fname, append=TRUE)
+    write(paste('OUTPUT_PROJECTION_TYPE = ',"UTM",sep=''), fname, append=TRUE)
+    write(paste('OUTPUT_PROJECTION_PARAMETERS = ( ','0 0 0 0 0 0 0 0 0 0 0 0',' )',sep=''), fname, append=TRUE)
+    write(paste('DATUM = ',"NoDatum",sep=''), fname, append=TRUE)
+    write(paste('UTM_ZONE = ',0,sep=''), fname, append=TRUE)
+    
+    #The Value within "as.character(250)" needs to be set in meters
+    write(paste('OUTPUT_PIXEL_SIZE = ',as.character(250),sep=''), fname, append=TRUE)
+    close(fname)
+    
+    
+    
+    #Reproject WGS
+    ####################
+    fname = file('tmp.prm', open="wt")
+    write(paste('INPUT_FILENAME = ', getwd(), '/',"NDVI_",TL,DATE[which(Date2==years[i])],".hdf", sep=""), fname) 
+    if (bands_subset != '') {
+      write(paste('SPECTRAL_SUBSET = ( ' ,1, ' )',sep=''),fname,append=TRUE)
+    }
+    write(paste('OUTPUT_FILENAME = ', "NDVI_WGS_",TL,DATE[which(Date2==years[i])],".tif", sep=""), fname, append=TRUE)
+    write(paste('RESAMPLING_TYPE = ',"CUBIC_CONVOLUTION",sep=''), fname, append=TRUE)
+    write(paste('OUTPUT_PROJECTION_TYPE = ',"GEO",sep=''), fname, append=TRUE)
+    write(paste('OUTPUT_PROJECTION_PARAMETERS = ( ','0 0 0 0 0 0 0 0 0 0 0 0',' )',sep=''), fname, append=TRUE)
+    write(paste('DATUM = ',"NoDatum",sep=''), fname, append=TRUE)
+    
+    #The Value within "as.character(0.02)" needs to be set in degrees
+    write(paste('OUTPUT_PIXEL_SIZE = ',as.character(0.02),sep=''), fname, append=TRUE)
+    close(fname)
+    
+    
+    #Now that the file .prm has been created, the following line will excute the resampling using MODIS Resampling Tool
+    system(paste(MRTpath, '/resample -p ',getwd(),'/','tmp.prm', sep=''))
+    
+    
+    #Convert to HDR
+    system(paste0("E:/HEG/HEG_Win/bin/HEconvert -i ", getwd(), "/", "NDVI_",TL,DATE[which(Date2==years[i])],".hdf", " -o ", getwd(), "/NDVI_",TL,DATE[which(Date2==years[i])],".hdr"))
+
+    
+    #Delete all Files in working dir
+    do.call(file.remove, list(list.files(getwd(),"(*\\.hdf$)|(*\\.prm$)|(*\\.txt$)", full.names = TRUE)))
+    
+    
+    print(paste(YR," - ",i))
+  }
+}
+
+
+stopCluster(cluster)
