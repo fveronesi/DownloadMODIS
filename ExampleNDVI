@@ -61,17 +61,17 @@ for(YR in na.omit(unique(format(Date2,"%Y")))){
     bands_subset = "1 0 0 0 0 0 0 0 0 0 0 0"
     
     #This line sends the code to execute mrtmosaic (within MODIS Reprojection Tool) via command line
-    system(paste(MRTpath, '/mrtmosaic -i ', MRTpath, '/TmpMosaic.prm -s "',bands_subset,'" -o ',getwd(), '/',"NDVI_",TL,DATE[which(Date2==years[i])],".hdf", sep=""))
+    system(paste(MRTpath, '/mrtmosaic -i ', MRTpath, '/TmpMosaic.prm -s "',bands_subset,'" -o ',getwd(), '/',"NDVI_",DATE[which(Date2==years[i])],".hdf", sep=""))
 
     
     #Reproject UTM
     ####################
     fname = file('tmp.prm', open="wt")
-    write(paste('INPUT_FILENAME = ', getwd(), '/',"NDVI_",TL,DATE[which(Date2==years[i])],".hdf", sep=""), fname) 
+    write(paste('INPUT_FILENAME = ', getwd(), '/',"NDVI_",DATE[which(Date2==years[i])],".hdf", sep=""), fname) 
     if (bands_subset != '') {
       write(paste('SPECTRAL_SUBSET = ( ' ,1, ' )',sep=''),fname,append=TRUE)
     }
-    write(paste('OUTPUT_FILENAME = ', "NDVI_WGS_",TL,DATE[which(Date2==years[i])],".tif", sep=""), fname, append=TRUE)
+    write(paste('OUTPUT_FILENAME = ', "NDVI_WGS_",DATE[which(Date2==years[i])],".tif", sep=""), fname, append=TRUE)
     write(paste('RESAMPLING_TYPE = ',"CUBIC_CONVOLUTION",sep=''), fname, append=TRUE)
     write(paste('OUTPUT_PROJECTION_TYPE = ',"UTM",sep=''), fname, append=TRUE)
     write(paste('OUTPUT_PROJECTION_PARAMETERS = ( ','0 0 0 0 0 0 0 0 0 0 0 0',' )',sep=''), fname, append=TRUE)
@@ -86,29 +86,25 @@ for(YR in na.omit(unique(format(Date2,"%Y")))){
     
     #Reproject WGS
     ####################
-    fname = file('tmp.prm', open="wt")
-    write(paste('INPUT_FILENAME = ', getwd(), '/',"NDVI_",TL,DATE[which(Date2==years[i])],".hdf", sep=""), fname) 
-    if (bands_subset != '') {
-      write(paste('SPECTRAL_SUBSET = ( ' ,1, ' )',sep=''),fname,append=TRUE)
-    }
-    write(paste('OUTPUT_FILENAME = ', "NDVI_WGS_",TL,DATE[which(Date2==years[i])],".tif", sep=""), fname, append=TRUE)
-    write(paste('RESAMPLING_TYPE = ',"CUBIC_CONVOLUTION",sep=''), fname, append=TRUE)
-    write(paste('OUTPUT_PROJECTION_TYPE = ',"GEO",sep=''), fname, append=TRUE)
-    write(paste('OUTPUT_PROJECTION_PARAMETERS = ( ','0 0 0 0 0 0 0 0 0 0 0 0',' )',sep=''), fname, append=TRUE)
-    write(paste('DATUM = ',"NoDatum",sep=''), fname, append=TRUE)
-    
-    #The Value within "as.character(0.02)" needs to be set in degrees
-    write(paste('OUTPUT_PIXEL_SIZE = ',as.character(0.02),sep=''), fname, append=TRUE)
-    close(fname)
+    # fname = file('tmp.prm', open="wt")
+    # write(paste('INPUT_FILENAME = ', getwd(), '/',"NDVI_",DATE[which(Date2==years[i])],".hdf", sep=""), fname) 
+    # if (bands_subset != '') {
+    #   write(paste('SPECTRAL_SUBSET = ( ' ,1, ' )',sep=''),fname,append=TRUE)
+    # }
+    # write(paste('OUTPUT_FILENAME = ', "NDVI_WGS_",DATE[which(Date2==years[i])],".tif", sep=""), fname, append=TRUE)
+    # write(paste('RESAMPLING_TYPE = ',"CUBIC_CONVOLUTION",sep=''), fname, append=TRUE)
+    # write(paste('OUTPUT_PROJECTION_TYPE = ',"GEO",sep=''), fname, append=TRUE)
+    # write(paste('OUTPUT_PROJECTION_PARAMETERS = ( ','0 0 0 0 0 0 0 0 0 0 0 0',' )',sep=''), fname, append=TRUE)
+    # write(paste('DATUM = ',"NoDatum",sep=''), fname, append=TRUE)
+    # 
+    # #The Value within "as.character(0.02)" needs to be set in degrees
+    # write(paste('OUTPUT_PIXEL_SIZE = ',as.character(0.02),sep=''), fname, append=TRUE)
+    # close(fname)
     
     
     #Now that the file .prm has been created, the following line will excute the resampling using MODIS Resampling Tool
     system(paste(MRTpath, '/resample -p ',getwd(),'/','tmp.prm', sep=''))
     
-    
-    #Convert to HDR
-    system(paste0("E:/HEG/HEG_Win/bin/HEconvert -i ", getwd(), "/", "NDVI_",TL,DATE[which(Date2==years[i])],".hdf", " -o ", getwd(), "/NDVI_",TL,DATE[which(Date2==years[i])],".hdr"))
-
     
     #Delete all Files in working dir
     do.call(file.remove, list(list.files(getwd(),"(*\\.hdf$)|(*\\.prm$)|(*\\.txt$)", full.names = TRUE)))
